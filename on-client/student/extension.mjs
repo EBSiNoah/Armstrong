@@ -16,14 +16,14 @@ export function createStudentView() {
         return node;
       };
       const deviceLabels = {
-        compliant: '보안 기준 충족',
-        noncompliant: '보안 기준 미충족',
+        compliant: '보안 기준 준수',
+        noncompliant: '보안 기준 미준수',
         unknown: '확인 불가',
       };
       const sessionLabels = {
         active: '활성',
         expired: '만료',
-        revoked: '철회됨',
+        revoked: '회수됨',
         unknown: '확인 불가',
       };
       const stateText = (labels, value) => {
@@ -32,7 +32,7 @@ export function createStudentView() {
       };
       const modeLabels = {
         connected: '연결됨(connected)',
-        demo: '예제 자료(demo) · 실제 연결 아님',
+        demo: '예제 데이터(demo) · 실제 연결 아님',
         disconnected: '연결 없음(disconnected)',
         unknown: '연결 상태 확인 불가(unknown)',
       };
@@ -47,12 +47,12 @@ export function createStudentView() {
           addText(section, 'p', `${name}: 불러오는 중`);
         } else if (status === 'error') {
           const message = safeText(resource.error && resource.error.message, '오류 내용을 확인할 수 없습니다.');
-          addText(section, 'p', `${name}을(를) 불러오지 못했습니다. 확인 불가. ${message}`, 'student-error');
+          addText(section, 'p', `${name}: 불러오지 못했습니다. 상태를 확인할 수 없습니다. ${message}`, 'student-error');
         } else if (status === 'ok') {
           if (allowOkData) renderOk(section, resource.data);
           else addText(section, 'p', blockedMessage || '현재 로그인 정보를 확인할 수 없어 이전 정보를 표시하지 않습니다.');
         } else {
-          addText(section, 'p', `${name}: 확인 불가 (상태를 확인할 수 없습니다)`);
+          addText(section, 'p', `${name}: 상태를 확인할 수 없습니다.`);
         }
 
         const mode = resource && typeof resource === 'object' ? resource.mode : undefined;
