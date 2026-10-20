@@ -147,11 +147,11 @@ export function createStudentView() {
       // 상태를 판정 데이터보다 먼저 처리해, 실패나 대기를 거부 판정으로 오해하지 않게 한다.
       const status = input && typeof input.status === 'string' ? input.status : 'unknown';
       if (status === 'idle') {
-        addText('p', '업무 앱을 선택하고 접근 요청을 하세요.', 'student-idle');
+        addText('p', '접근 요청 전입니다. 업무 앱을 선택한 뒤 접근을 요청하세요.', 'student-idle');
         return root;
       }
       if (status === 'loading') {
-        addText('p', '접근 판정을 확인하는 중입니다.', 'student-loading');
+        addText('p', '접근 판정 요청을 처리하는 중입니다.', 'student-loading');
         return root;
       }
       if (status === 'error') {
@@ -159,7 +159,7 @@ export function createStudentView() {
         const message = typeof rawMessage === 'string' && rawMessage.trim()
           ? rawMessage
           : '오류 내용을 확인할 수 없습니다.';
-        addText('p', '접근 요청 실패입니다. 이는 접근 거부 판정이 아닙니다.', 'student-error');
+        addText('p', '접근 요청에 실패했습니다. 요청 실패는 접근 거부 판정이 아닙니다.', 'student-error');
         addText('p', message, 'student-error-message');
         return root;
       }
