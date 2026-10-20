@@ -316,7 +316,8 @@ export function createStudentView() {
             ? `${new Date(event.at).toLocaleString('ko-KR')} (${event.at})`
             : showValue(event.at);
           addText(item, 'p', `시각: ${at}`, 'student-event-time');
-          addText(item, 'p', `종류(kind): ${showValue(event.kind)}`, 'student-event-kind');
+          const kindLabel = event.kind === 'access' ? '접속 기록' : event.kind === 'xdr' ? 'XDR 경보' : '';
+          addText(item, 'p', `종류(kind): ${showValue(event.kind)}${kindLabel ? ` · ${kindLabel}` : ''}`, 'student-event-kind');
           addText(item, 'p', `앱(appId): ${showValue(event.appId)}`, 'student-event-app');
           addText(item, 'p', `요약: ${showValue(event.summary)}`, 'student-event-summary');
           if (!Array.isArray(event.supportedActions) || event.supportedActions.length === 0) {
