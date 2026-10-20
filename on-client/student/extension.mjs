@@ -182,11 +182,10 @@ export function createStudentView() {
         unknown: '판정 확인 불가',
       };
       const decision = input.data.decision;
-      const originalCode = typeof decision === 'string' && decision.trim()
-        ? decision
-        : '알 수 없는 값';
-      const decisionLabel = Object.hasOwn(decisions, decision) ? decisions[decision] : '판정 확인 불가';
-      addText('p', `${decisionLabel}(${originalCode})`, 'student-decision-result');
+      const isKnownDecision = typeof decision === 'string' && Object.hasOwn(decisions, decision);
+      const displayCode = isKnownDecision ? decision : 'unknown';
+      const decisionLabel = decisions[displayCode];
+      addText('p', `${decisionLabel}(${displayCode})`, 'student-decision-result');
 
       if (decision === 'allow') {
         addText('p', '정책상 접근 허용이며 실제 앱 접속 성공을 보장하지 않습니다.', 'student-decision-note');
