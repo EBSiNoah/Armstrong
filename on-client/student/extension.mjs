@@ -1,6 +1,9 @@
 // 이 파일은 학생이 같은 프로젝트에서 이어서 구현합니다.
 // 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
 export function createStudentView() {
+  let eventFilters = { kind: 'all', appId: 'all', access: 'all' };
+  let selectedEventId = null;
+
   return {
     renderIdentity(input = {}) {
       const root = document.createElement('div');
@@ -205,7 +208,174 @@ export function createStudentView() {
       addText('p', `판정 시각: ${checkedAtLabel}`, 'student-checked-at');
       return root;
     },
-    renderEvents() { return '학생 구현 대기: 본인 접속·XDR 기록을 연결하세요.'; },
+    renderEvents(input = {}) {
+      const root = document.createElement('div');
+      root.className = 'student-events';
+      const addText = (parent, tag, value, className) => {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        node.textContent = value;
+        parent.appendChild(node);
+        return node;
+      };
+      const showValue = (value, fallback = '확인 불가') =>
+        typeof value === 'string' && value.trim() ? value : fallback;
+
+      if (input.status === 'loading') {
+        // 새 조회가 시작되면 이전 응답에서 선택한 상세는 더 이상 최신 정보로 취급하지 않는다.
+        selectedEventId = null;
+        addText(root, 'p', '보안 기록을 불러오는 중…', 'student-events-loading');
+        return root;
+      }
+      if (input.status === 'error') {
+        // 실패 상태에서는 이전 상세 선택도 폐기하고 이전 목록을 재사용하지 않는다.
+        selectedEventId = null;
+        const message = showValue(input.error && input.error.message, '오류 내용을 확인할 수 없습니다.');
+        addText(root, 'p', `기록을 불러오지 못했습니다. ${message}`, 'student-events-error');
+        return root;
+      }
+      if (input.status !== 'ok' || !Array.isArray(input.data)) {
+        addText(root, 'p', '보안 기록을 확인할 수 없습니다.', 'student-events-unverified');
+        return root;
+      }
+
+      addText(root, 'p', '현재 조회 범위는 본인의 최근 40건입니다. 모든 직원의 전체 이력이나 실시간 전체 위협 탐지가 아닙니다.', 'student-events-scope');
+
+      // 서버가 준 배열·객체는 변경하지 않고, 복사본만 최신 시각순으로 정렬한다.
+      const events = [...input.data].sort((left, right) => {
+        const leftAt = Date.parse(left && left.at);
+        const rightAt = Date.parse(right && right.at);
+        return (Number.isFinite(rightAt) ? rightAt : -Infinity)
+          - (Number.isFinite(leftAt) ? leftAt : -Infinity);
+      });
+      const valuesFor = (field) => [...new Set(events.map((event) => {
+        if (field === 'access') return event && event.state && event.state.access;
+        return event && event[field];
+      }).filter((value) => typeof value === 'string' && value.length > 0))];
+      const optionsByFilter = {
+        kind: valuesFor('kind'),
+        appId: valuesFor('appId'),
+        access: valuesFor('access'),
+      };
+      for (const key of Object.keys(eventFilters)) {
+        if (eventFilters[key] !== 'all' && !optionsByFilter[key].includes(eventFilters[key])) eventFilters[key] = 'all';
+      }
+
+      const filters = document.createElement('div');
+      filters.className = 'student-event-filters';
+      const makeFilter = (key, labelText, allText) => {
+        const label = document.createElement('label');
+        label.className = 'student-event-filter';
+        addText(label, 'span', labelText);
+        const select = document.createElement('select');
+        select.name = key;
+        select.dataset.studentEventFilter = key;
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = allText;
+        select.appendChild(allOption);
+        for (const value of optionsByFilter[key]) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = value;
+          select.appendChild(option);
+        }
+        select.value = eventFilters[key];
+        select.addEventListener('change', () => {
+          eventFilters[key] = select.value;
+          const next = this.renderEvents(input);
+          root.replaceWith(next);
+        });
+        label.appendChild(select);
+        filters.appendChild(label);
+      };
+      makeFilter('kind', '기록 종류', '전체 종류');
+      makeFilter('appId', '업무 앱', '전체 앱');
+      makeFilter('access', '접속 상태', '전체 상태');
+      root.appendChild(filters);
+
+      const visibleEvents = events.filter((event) =>
+        (event.kind === eventFilters.kind || eventFilters.kind === 'all')
+        && ((event.appId == null ? '' : event.appId) === eventFilters.appId || eventFilters.appId === 'all')
+        && ((event.state && event.state.access) === eventFilters.access || eventFilters.access === 'all'));
+      addText(root, 'p', `표시 건수: ${visibleEvents.length}건`, 'student-events-count');
+      if (!visibleEvents.some((event) => event.id === selectedEventId)) selectedEventId = null;
+
+      if (visibleEvents.length === 0) {
+        addText(root, 'p', events.length === 0 ? '표시할 기록이 없습니다.' : '선택한 필터와 일치하는 기록이 없습니다.', 'student-events-empty');
+      } else {
+        const list = document.createElement('ul');
+        list.className = 'student-event-list';
+        for (const event of visibleEvents) {
+          const item = document.createElement('li');
+          item.className = 'student-event-row';
+          item.setAttribute('data-student-event-id', showValue(event.id, ''));
+          const heading = addText(item, 'h3', `기록 ${showValue(event.id)}`);
+          heading.className = 'student-event-title';
+          const at = typeof event.at === 'string' && Number.isFinite(Date.parse(event.at))
+            ? `${new Date(event.at).toLocaleString('ko-KR')} (${event.at})`
+            : showValue(event.at);
+          addText(item, 'p', `시각: ${at}`, 'student-event-time');
+          addText(item, 'p', `종류(kind): ${showValue(event.kind)}`, 'student-event-kind');
+          addText(item, 'p', `앱(appId): ${showValue(event.appId)}`, 'student-event-app');
+          addText(item, 'p', `요약: ${showValue(event.summary)}`, 'student-event-summary');
+          if (!Array.isArray(event.supportedActions) || event.supportedActions.length === 0) {
+            addText(item, 'p', '지원 조치가 없습니다. 조치 버튼을 표시하지 않습니다.', 'student-event-no-actions');
+          }
+          const detailButton = document.createElement('button');
+          detailButton.type = 'button';
+          detailButton.textContent = `${showValue(event.id)} 상세`;
+          detailButton.addEventListener('click', () => {
+            selectedEventId = event.id;
+            root.replaceWith(this.renderEvents(input));
+          });
+          item.appendChild(detailButton);
+          list.appendChild(item);
+        }
+        root.appendChild(list);
+      }
+
+      const selected = visibleEvents.find((event) => event.id === selectedEventId);
+      if (selected) {
+        const detail = document.createElement('section');
+        detail.className = 'student-event-detail';
+        detail.setAttribute('data-student-event-detail-id', selected.id);
+        addText(detail, 'h3', `${selected.id} 상세`);
+
+        const addTextRows = (heading, rows, className) => {
+          const section = document.createElement('section');
+          section.className = className;
+          addText(section, 'h4', heading);
+          if (!Array.isArray(rows) || rows.length === 0) {
+            addText(section, 'p', '표시할 내용이 없습니다.');
+          } else {
+            const list = document.createElement('ul');
+            for (const row of rows) {
+              const item = document.createElement('li');
+              const id = showValue(row && row.id);
+              const text = showValue(row && row.text);
+              item.textContent = `${id}: ${text}`;
+              list.appendChild(item);
+            }
+            section.appendChild(list);
+          }
+          detail.appendChild(section);
+        };
+        addTextRows('근거 (evidence)', selected.evidence, 'student-event-evidence');
+        addTextRows('규칙 (rules)', selected.rules, 'student-event-rules');
+
+        const state = selected.state && typeof selected.state === 'object' ? selected.state : {};
+        const states = document.createElement('section');
+        states.className = 'student-event-states';
+        addText(states, 'h4', '현재 상태');
+        addText(states, 'p', `접속(access): ${showValue(state.access)}`, 'student-event-access-state');
+        addText(states, 'p', `세션(session): ${showValue(state.session)}`, 'student-event-session-state');
+        addText(states, 'p', `기기(device): ${showValue(state.device)}`, 'student-event-device-state');
+        detail.appendChild(states);
+        root.appendChild(detail);
+      }
+      return root;
+    },
     renderStatus() { return '학생 구현 대기: 기기·세션·알림과 연결 점검 상태를 구분하세요.'; },
     renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
     renderAiConnection() { return '학생 구현 대기: 모델 응답 점검과 실제 사건 설명을 구분하고 AI 오류·취소·수동 복구를 안내하세요.'; },
