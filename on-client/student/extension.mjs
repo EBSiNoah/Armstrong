@@ -339,8 +339,9 @@ export function createStudentView() {
       if (selected) {
         const detail = document.createElement('section');
         detail.className = 'student-event-detail';
-        detail.setAttribute('data-student-event-detail-id', selected.id);
+        detail.setAttribute('data-student-event-detail', showValue(selected.id, ''));
         addText(detail, 'h3', `${selected.id} 상세`);
+        addText(detail, 'p', `앱(appId): ${showValue(selected.appId)}`, 'student-event-app');
 
         const addTextRows = (heading, rows, className) => {
           const section = document.createElement('section');
@@ -365,12 +366,21 @@ export function createStudentView() {
         addTextRows('규칙 (rules)', selected.rules, 'student-event-rules');
 
         const state = selected.state && typeof selected.state === 'object' ? selected.state : {};
+        const stateLabels = {
+          access: { allowed: '허용됨', denied: '거부됨', unknown: '확인 불가' },
+          session: { active: '활성', expired: '만료', revoked: '회수됨', unknown: '확인 불가' },
+          device: { compliant: '보안 기준 준수', noncompliant: '보안 기준 미준수', unknown: '확인 불가' },
+        };
+        const stateText = (key, value) => {
+          const code = showValue(value, 'unknown');
+          return `${stateLabels[key][code] || '확인 불가'}(${code})`;
+        };
         const states = document.createElement('section');
         states.className = 'student-event-states';
         addText(states, 'h4', '현재 상태');
-        addText(states, 'p', `접속(access): ${showValue(state.access)}`, 'student-event-access-state');
-        addText(states, 'p', `세션(session): ${showValue(state.session)}`, 'student-event-session-state');
-        addText(states, 'p', `기기(device): ${showValue(state.device)}`, 'student-event-device-state');
+        addText(states, 'p', `접속(access): ${stateText('access', state.access)}`, 'student-event-access-state');
+        addText(states, 'p', `세션(session): ${stateText('session', state.session)}`, 'student-event-session-state');
+        addText(states, 'p', `기기(device): ${stateText('device', state.device)}`, 'student-event-device-state');
         detail.appendChild(states);
         root.appendChild(detail);
       }
