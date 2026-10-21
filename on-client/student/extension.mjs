@@ -413,9 +413,10 @@ export function createStudentView() {
     renderStatus(input = {}) {
       const root = document.createElement('div');
       root.className = 'student-status';
-      const addText = (parent, tag, value, className) => {
+      const addText = (parent, tag, value, className, role) => {
         const node = document.createElement(tag);
         if (className) node.className = className;
+        if (role) node.setAttribute('role', role);
         node.textContent = value;
         parent.appendChild(node);
         return node;
@@ -432,16 +433,17 @@ export function createStudentView() {
         section.className = 'student-status-resource';
         addText(section, 'h3', name);
         if (resource && resource.status === 'loading') {
-          addText(section, 'p', `${name} 조회 중입니다.`, 'student-loading');
+          addText(section, 'p', `${name} 조회 중입니다.`, 'student-loading', 'status');
         } else if (resource && resource.status === 'error') {
-          addText(section, 'p', `${name} 조회에 실패했습니다. ${errorMessage(resource)}`, 'student-error');
+          addText(section, 'p', `${name} 조회에 실패했습니다. ${errorMessage(resource)}`, 'student-error', 'alert');
           addText(section, 'p', '화면 상단의 「다시 불러오기」를 눌러 재조회하세요.');
         } else if (resource && resource.status === 'ok') {
           if (!Array.isArray(resource.data)) {
-            addText(section, 'p', `${name} 응답 형식이 올바르지 않습니다.`, 'student-unverified');
+            addText(section, 'p', `${name} 응답 형식이 올바르지 않습니다.`, 'student-unverified', 'alert');
           } else if (resource.data.length === 0) {
-            addText(section, 'p', emptyText, 'student-empty');
+            addText(section, 'p', emptyText, 'student-empty', 'status');
           } else {
+            addText(section, 'p', `${name} 조회 완료: ${resource.data.length}건`, 'student-ok', 'status');
             const list = document.createElement('ul');
             for (const row of resource.data) {
               const item = document.createElement('li');
@@ -451,7 +453,7 @@ export function createStudentView() {
             section.appendChild(list);
           }
         } else {
-          addText(section, 'p', `${name} 조회 상태를 확인할 수 없습니다.`, 'student-unverified');
+          addText(section, 'p', `${name} 조회 상태를 확인할 수 없습니다.`, 'student-unverified', 'status');
         }
         root.appendChild(section);
       };
@@ -487,13 +489,13 @@ export function createStudentView() {
       addText(diagnosticSection, 'h3', '진단 정보');
       let diagnosticInfo = null;
       if (diagnostics && diagnostics.status === 'loading') {
-        addText(diagnosticSection, 'p', '진단 정보 조회 중입니다.', 'student-loading');
+        addText(diagnosticSection, 'p', '진단 정보 조회 중입니다.', 'student-loading', 'status');
       } else if (diagnostics && diagnostics.status === 'error') {
-        addText(diagnosticSection, 'p', `진단 정보 조회에 실패했습니다. ${errorMessage(diagnostics)}`, 'student-error');
+        addText(diagnosticSection, 'p', `진단 정보 조회에 실패했습니다. ${errorMessage(diagnostics)}`, 'student-error', 'alert');
         addText(diagnosticSection, 'p', '제공 화면의 「도움정보 불러오기」를 눌러 재조회하세요.');
       } else if (diagnostics && diagnostics.status === 'ok'
           && Array.isArray(diagnostics.data) && diagnostics.data.length === 0) {
-        addText(diagnosticSection, 'p', '진단 결과가 없습니다.', 'student-empty');
+        addText(diagnosticSection, 'p', '진단 결과가 없습니다.', 'student-empty', 'status');
       } else if (diagnostics && diagnostics.status === 'ok'
           && diagnostics.data && typeof diagnostics.data === 'object' && !Array.isArray(diagnostics.data)) {
         const data = diagnostics.data;
@@ -508,6 +510,7 @@ export function createStudentView() {
             code: showValue(engine.code),
           },
         };
+        addText(diagnosticSection, 'p', '진단 정보 조회 완료.', 'student-ok', 'status');
         const rows = [
           ['requestId', diagnosticInfo.requestId],
           ['component', diagnosticInfo.component],
@@ -524,9 +527,9 @@ export function createStudentView() {
         }
         diagnosticSection.appendChild(list);
       } else if (diagnostics && diagnostics.status === 'ok') {
-        addText(diagnosticSection, 'p', '진단 정보 응답 형식이 올바르지 않습니다.', 'student-unverified');
+        addText(diagnosticSection, 'p', '진단 정보 응답 형식이 올바르지 않습니다.', 'student-unverified', 'alert');
       } else {
-        addText(diagnosticSection, 'p', '진단 정보를 아직 조회하지 않았습니다. 제공 화면에서 「도움정보 불러오기」를 눌러 조회하세요.');
+        addText(diagnosticSection, 'p', '진단 정보를 아직 조회하지 않았습니다. 제공 화면에서 「도움정보 불러오기」를 눌러 조회하세요.', undefined, 'status');
       }
 
       const copyButton = document.createElement('button');
@@ -544,14 +547,14 @@ export function createStudentView() {
         copyStatus.textContent = helpCopyStatus;
       });
       diagnosticSection.appendChild(copyButton);
-      const copyStatus = addText(diagnosticSection, 'p', helpCopyStatus, 'student-copy-status');
+      const copyStatus = addText(diagnosticSection, 'p', helpCopyStatus, 'student-copy-status', 'status');
       root.appendChild(diagnosticSection);
 
       const notificationsSection = document.createElement('section');
       notificationsSection.className = 'student-status-notifications';
       addText(notificationsSection, 'h3', '알림');
       if (Array.isArray(input.notifications) && input.notifications.length === 0) {
-        addText(notificationsSection, 'p', '알림 없음', 'student-notifications-empty');
+        addText(notificationsSection, 'p', '알림 없음', 'student-notifications-empty', 'status');
       } else if (Array.isArray(input.notifications)) {
         const list = document.createElement('ul');
         for (const notification of input.notifications) {
@@ -564,7 +567,7 @@ export function createStudentView() {
         }
         notificationsSection.appendChild(list);
       } else {
-        addText(notificationsSection, 'p', '알림 조회 결과를 확인할 수 없습니다.', 'student-unverified');
+        addText(notificationsSection, 'p', '알림 조회 결과를 확인할 수 없습니다.', 'student-unverified', 'status');
       }
       root.appendChild(notificationsSection);
       return root;
