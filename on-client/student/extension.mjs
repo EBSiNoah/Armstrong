@@ -27,7 +27,7 @@ export function createStudentView() {
       const sessionLabels = {
         active: '활성',
         expired: '만료',
-        revoked: '회수됨',
+        revoked: '취소됨',
         unknown: '확인 불가',
       };
       const stateText = (labels, value) => {
@@ -225,18 +225,19 @@ export function createStudentView() {
       if (input.status === 'loading') {
         // 새 조회가 시작되면 이전 응답에서 선택한 상세는 더 이상 최신 정보로 취급하지 않는다.
         selectedEventId = null;
-        addText(root, 'p', '보안 기록을 불러오는 중…', 'student-events-loading');
+        addText(root, 'p', '보안 기록 조회 중입니다.', 'student-events-loading');
         return root;
       }
       if (input.status === 'error') {
         // 실패 상태에서는 이전 상세 선택도 폐기하고 이전 목록을 재사용하지 않는다.
         selectedEventId = null;
         const message = showValue(input.error && input.error.message, '오류 내용을 확인할 수 없습니다.');
-        addText(root, 'p', `기록을 불러오지 못했습니다. ${message}`, 'student-events-error');
+        addText(root, 'p', `보안 기록 조회에 실패했습니다. ${message}`, 'student-events-error');
+        addText(root, 'p', '화면 상단의 「다시 불러오기」를 눌러 재조회하세요.');
         return root;
       }
       if (input.status !== 'ok' || !Array.isArray(input.data)) {
-        addText(root, 'p', '보안 기록을 확인할 수 없습니다.', 'student-events-unverified');
+        addText(root, 'p', '보안 기록 조회 상태를 확인할 수 없습니다.', 'student-events-unverified');
         return root;
       }
 
@@ -303,7 +304,7 @@ export function createStudentView() {
       if (!visibleEvents.some((event) => event.id === selectedEventId)) selectedEventId = null;
 
       if (visibleEvents.length === 0) {
-        addText(root, 'p', events.length === 0 ? '표시할 기록이 없습니다.' : '선택한 필터와 일치하는 기록이 없습니다.', 'student-events-empty');
+        addText(root, 'p', events.length === 0 ? '조회된 보안 기록이 없습니다.' : '필터 조건에 맞는 보안 기록이 없습니다.', 'student-events-empty');
       } else {
         const list = document.createElement('ul');
         list.className = 'student-event-list';
@@ -342,12 +343,12 @@ export function createStudentView() {
         addText(detail, 'h3', `${selected.id} 상세`);
         addText(detail, 'p', `앱(appId): ${showValue(selected.appId)}`, 'student-event-app');
 
-        const addTextRows = (heading, rows, className) => {
+        const addTextRows = (heading, rows, className, emptyText) => {
           const section = document.createElement('section');
           section.className = className;
           addText(section, 'h4', heading);
           if (!Array.isArray(rows) || rows.length === 0) {
-            addText(section, 'p', '표시할 내용이 없습니다.');
+            addText(section, 'p', emptyText);
           } else {
             const list = document.createElement('ul');
             for (const row of rows) {
@@ -361,8 +362,8 @@ export function createStudentView() {
           }
           detail.appendChild(section);
         };
-        addTextRows('근거 (evidence)', selected.evidence, 'student-event-evidence');
-        addTextRows('규칙 (rules)', selected.rules, 'student-event-rules');
+        addTextRows('근거 (evidence)', selected.evidence, 'student-event-evidence', '근거 데이터가 없습니다.');
+        addTextRows('규칙 (rules)', selected.rules, 'student-event-rules', '규칙 데이터가 없습니다.');
 
         const state = selected.state && typeof selected.state === 'object' ? selected.state : {};
         const stateLabels = {
@@ -376,7 +377,7 @@ export function createStudentView() {
         };
         const states = document.createElement('section');
         states.className = 'student-event-states';
-        addText(states, 'h4', '현재 상태');
+        addText(states, 'h4', '기록 상태');
         addText(states, 'p', `접속(access): ${stateText('access', state.access)}`, 'student-event-access-state');
         addText(states, 'p', `세션(session): ${stateText('session', state.session)}`, 'student-event-session-state');
         addText(states, 'p', `기기(device): ${stateText('device', state.device)}`, 'student-event-device-state');
@@ -431,13 +432,13 @@ export function createStudentView() {
         section.className = 'student-status-resource';
         addText(section, 'h3', name);
         if (resource && resource.status === 'loading') {
-          addText(section, 'p', `${name}을 불러오는 중입니다.`, 'student-loading');
+          addText(section, 'p', `${name} 조회 중입니다.`, 'student-loading');
         } else if (resource && resource.status === 'error') {
           addText(section, 'p', `${name} 조회에 실패했습니다. ${errorMessage(resource)}`, 'student-error');
-          addText(section, 'p', '제공 화면의 「다시 불러오기」를 눌러 다시 시도하세요.');
+          addText(section, 'p', '화면 상단의 「다시 불러오기」를 눌러 재조회하세요.');
         } else if (resource && resource.status === 'ok') {
           if (!Array.isArray(resource.data)) {
-            addText(section, 'p', `${name} 응답 형식을 확인할 수 없습니다.`, 'student-unverified');
+            addText(section, 'p', `${name} 응답 형식이 올바르지 않습니다.`, 'student-unverified');
           } else if (resource.data.length === 0) {
             addText(section, 'p', emptyText, 'student-empty');
           } else {
@@ -450,7 +451,7 @@ export function createStudentView() {
             section.appendChild(list);
           }
         } else {
-          addText(section, 'p', `${name} 상태를 확인할 수 없습니다.`, 'student-unverified');
+          addText(section, 'p', `${name} 조회 상태를 확인할 수 없습니다.`, 'student-unverified');
         }
         root.appendChild(section);
       };
@@ -463,7 +464,7 @@ export function createStudentView() {
       const sessionLabels = {
         active: '활성',
         expired: '만료',
-        revoked: '회수됨',
+        revoked: '취소됨',
         unknown: '확인 불가',
       };
       const labeledState = (labels, value) => {
@@ -475,7 +476,7 @@ export function createStudentView() {
         const value = row && typeof row === 'object' ? row : {};
         return `${showValue(value.label)} · ID: ${showValue(value.id)} · ${labeledState(deviceLabels, value.status)}`;
       });
-      renderListResource('세션', input.sessions, '표시할 세션이 없습니다.', (row) => {
+      renderListResource('세션', input.sessions, '조회된 세션이 없습니다.', (row) => {
         const value = row && typeof row === 'object' ? row : {};
         return `ID: ${showValue(value.id)} · ${labeledState(sessionLabels, value.status)}`;
       });
@@ -486,13 +487,13 @@ export function createStudentView() {
       addText(diagnosticSection, 'h3', '진단 정보');
       let diagnosticInfo = null;
       if (diagnostics && diagnostics.status === 'loading') {
-        addText(diagnosticSection, 'p', '진단 정보를 불러오는 중입니다.', 'student-loading');
+        addText(diagnosticSection, 'p', '진단 정보 조회 중입니다.', 'student-loading');
       } else if (diagnostics && diagnostics.status === 'error') {
         addText(diagnosticSection, 'p', `진단 정보 조회에 실패했습니다. ${errorMessage(diagnostics)}`, 'student-error');
-        addText(diagnosticSection, 'p', '제공 화면의 「도움정보 불러오기」를 눌러 다시 시도하세요.');
+        addText(diagnosticSection, 'p', '제공 화면의 「도움정보 불러오기」를 눌러 재조회하세요.');
       } else if (diagnostics && diagnostics.status === 'ok'
           && Array.isArray(diagnostics.data) && diagnostics.data.length === 0) {
-        addText(diagnosticSection, 'p', '진단 정보가 없습니다.', 'student-empty');
+        addText(diagnosticSection, 'p', '진단 결과가 없습니다.', 'student-empty');
       } else if (diagnostics && diagnostics.status === 'ok'
           && diagnostics.data && typeof diagnostics.data === 'object' && !Array.isArray(diagnostics.data)) {
         const data = diagnostics.data;
@@ -523,9 +524,9 @@ export function createStudentView() {
         }
         diagnosticSection.appendChild(list);
       } else if (diagnostics && diagnostics.status === 'ok') {
-        addText(diagnosticSection, 'p', '진단 정보 응답 형식을 확인할 수 없습니다.', 'student-unverified');
+        addText(diagnosticSection, 'p', '진단 정보 응답 형식이 올바르지 않습니다.', 'student-unverified');
       } else {
-        addText(diagnosticSection, 'p', '진단 정보를 아직 조회하지 않았습니다. 제공 화면에서 도움정보 조회를 직접 시작하세요.');
+        addText(diagnosticSection, 'p', '진단 정보를 아직 조회하지 않았습니다. 제공 화면에서 「도움정보 불러오기」를 눌러 조회하세요.');
       }
 
       const copyButton = document.createElement('button');
@@ -538,7 +539,7 @@ export function createStudentView() {
           await navigator.clipboard.writeText(JSON.stringify(diagnosticInfo, null, 2));
           helpCopyStatus = '도움정보를 클립보드에 복사했습니다.';
         } catch {
-          helpCopyStatus = '자동 복사를 사용할 수 없습니다. 제공 화면의 도움정보를 직접 확인하세요.';
+          helpCopyStatus = '클립보드 복사에 실패했습니다. 표시된 진단 항목을 직접 선택해 복사하세요.';
         }
         copyStatus.textContent = helpCopyStatus;
       });
@@ -563,7 +564,7 @@ export function createStudentView() {
         }
         notificationsSection.appendChild(list);
       } else {
-        addText(notificationsSection, 'p', '알림을 확인할 수 없습니다.', 'student-unverified');
+        addText(notificationsSection, 'p', '알림 조회 결과를 확인할 수 없습니다.', 'student-unverified');
       }
       root.appendChild(notificationsSection);
       return root;
