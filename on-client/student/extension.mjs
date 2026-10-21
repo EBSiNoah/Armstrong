@@ -382,10 +382,16 @@ export function createStudentView() {
         addText(states, 'p', `기기(device): ${stateText('device', state.device)}`, 'student-event-device-state');
         detail.appendChild(states);
 
-        // 이 학생 화면은 조치를 지원·전송하지 않는다. 제안된 항목만 비활성 상태로 알린다.
-        const unsupportedActions = Array.isArray(selected.supportedActions)
+        // 명시적으로 입력된 조치 중 지원 목록에 없는 항목만 알린다. 조치 요청은 보내지 않는다.
+        const supportedActions = new Set(Array.isArray(selected.supportedActions)
           ? selected.supportedActions.filter((action) => typeof action === 'string' && action.trim())
-          : [];
+          : []);
+        const actionInputs = [
+          ...(Array.isArray(selected.unsupportedActions) ? selected.unsupportedActions : []),
+          ...(typeof selected.action === 'string' ? [selected.action] : []),
+        ];
+        const unsupportedActions = [...new Set(actionInputs.filter((action) =>
+          typeof action === 'string' && action.trim() && !supportedActions.has(action)))];
         if (unsupportedActions.length > 0) {
           const actions = document.createElement('section');
           actions.className = 'student-event-actions';
@@ -485,6 +491,9 @@ export function createStudentView() {
         addText(diagnosticSection, 'p', `진단 정보 조회에 실패했습니다. ${errorMessage(diagnostics)}`, 'student-error');
         addText(diagnosticSection, 'p', '제공 화면의 「도움정보 불러오기」를 눌러 다시 시도하세요.');
       } else if (diagnostics && diagnostics.status === 'ok'
+          && Array.isArray(diagnostics.data) && diagnostics.data.length === 0) {
+        addText(diagnosticSection, 'p', '진단 정보가 없습니다.', 'student-empty');
+      } else if (diagnostics && diagnostics.status === 'ok'
           && diagnostics.data && typeof diagnostics.data === 'object' && !Array.isArray(diagnostics.data)) {
         const data = diagnostics.data;
         const engine = data.engine && typeof data.engine === 'object' && !Array.isArray(data.engine) ? data.engine : {};
@@ -492,7 +501,7 @@ export function createStudentView() {
           requestId: showValue(data.requestId),
           component: showValue(data.component),
           version: showValue(data.version),
-          checkedAt: showValue(data.checkedAt, showValue(diagnostics.meta && diagnostics.meta.checkedAt)),
+          checkedAt: showValue(data.checkedAt),
           engine: {
             mode: showValue(engine.mode),
             code: showValue(engine.code),
