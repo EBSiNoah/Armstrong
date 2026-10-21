@@ -662,29 +662,33 @@ export function createStudentView() {
       addText('p', `연결 모드: ${modeLabels[mode]}`, 'student-mode');
 
       if (status === 'idle') {
-        addText('p', 'AI 연결 점검 전입니다. 계정 연결·AI 앱 승인과 별도로 「현재 API 연결 점검」을 직접 눌러 확인하세요.', 'student-ai-idle');
+        addText('p', 'AI 연결 점검이 아직 수행되지 않았습니다. 계정 연결 및 AI 앱 승인과 별도로 「현재 API 연결 점검」을 실행하세요.', 'student-ai-idle');
         return root;
       }
       if (status === 'loading') {
-        addText('p', '현재 API 연결을 점검하는 중입니다. 아직 결과가 확인되지 않았습니다.', 'student-ai-loading');
-        addText('p', '이 점검은 모델 접근 확인이며 사건 설명을 실행하지 않습니다.', 'student-ai-separation');
+        addText('p', 'AI 모델 목록 조회를 수행 중입니다. 조회가 완료되기 전에는 결과를 판단할 수 없습니다.', 'student-ai-loading');
+        addText('p', '이 점검은 모델 목록 접근 확인이며 사건 설명 요청을 실행하지 않습니다.', 'student-ai-separation');
         return root;
       }
       if (status === 'error') {
         const knownCodes = Object.keys(AI_MESSAGES);
         const rawCode = input.error && input.error.code;
         const code = typeof rawCode === 'string' && knownCodes.includes(rawCode) ? rawCode : 'AI_REQUEST_UNVERIFIED';
-        let category = '연결 또는 응답 확인';
-        if (['WB_CLCO_AUTH_REQUIRED', 'WB_CLCO_INVALID_TOKEN'].includes(code)) category = '인증';
-        else if (['ON_AI_PROVISIONING_PENDING', 'ON_AI_AUTHORIZATION_CHANGED', 'WB_CLCO_ACCESS_BLOCKED'].includes(code)) category = '권한·승인';
-        else if (['WB_CLCO_COHORT_BUDGET_EXHAUSTED', 'WB_CLCO_RATE_LIMITED', 'WB_CLCO_LIMIT_REACHED'].includes(code)) category = '사용량·한도·요청 제한';
-        else if (code === 'WB_CLCO_SESSION_CLOSED') category = '이용 시간';
-        else if (['WB_CLCO_TIMEOUT', 'REQUEST_TIMEOUT', 'ENGINE_TIMEOUT', 'TIMEOUT'].includes(code)) category = '시간 초과';
-        else if (['WB_CLCO_CANCELLED', 'CANCELLED', 'REQUEST_CANCELLED'].includes(code)) category = '취소';
-        else if (['ON_AI_MODEL_LIST_EMPTY', 'MODEL_NOT_CONFIGURED'].includes(code)) category = '사용 가능한 모델 없음';
-        else if (['WB_CLCO_NETWORK_ERROR', 'WB_CLCO_SERVER_UNAVAILABLE', 'NETWORK_ERROR'].includes(code)) category = '네트워크·AI 서버 연결';
-        else if (code === 'SUBJECT_SCOPE_UNVERIFIED') category = '계정·사건 범위 확인';
-        else if (['ON_AI_INVALID_INPUT', 'ON_AI_INVALID_OUTPUT', 'WB_CLCO_INVALID_RESPONSE'].includes(code)) category = '입력·응답 형식';
+        let category = 'AI 연결 또는 응답 확인 오류';
+        if (['WB_CLCO_AUTH_REQUIRED', 'WB_CLCO_INVALID_TOKEN'].includes(code)) category = '인증 오류';
+        else if (['ON_AI_PROVISIONING_PENDING', 'ON_AI_AUTHORIZATION_CHANGED', 'WB_CLCO_ACCESS_BLOCKED'].includes(code)) category = '앱 인가·이용 권한 오류';
+        else if (code === 'WB_CLCO_COHORT_BUDGET_EXHAUSTED') category = '반 공동 사용량 한도 초과';
+        else if (code === 'WB_CLCO_RATE_LIMITED') category = '요청 빈도 제한';
+        else if (code === 'WB_CLCO_LIMIT_REACHED') category = 'AI 이용 한도 초과';
+        else if (code === 'WB_CLCO_SESSION_CLOSED') category = 'AI 이용 시간 제한';
+        else if (['WB_CLCO_TIMEOUT', 'REQUEST_TIMEOUT', 'ENGINE_TIMEOUT', 'TIMEOUT'].includes(code)) category = '요청 시간 초과';
+        else if (['WB_CLCO_CANCELLED', 'CANCELLED', 'REQUEST_CANCELLED'].includes(code)) category = '요청 취소';
+        else if (code === 'ON_AI_MODEL_LIST_EMPTY') category = '허용된 모델 없음';
+        else if (code === 'MODEL_NOT_CONFIGURED') category = '모델 설정 누락';
+        else if (['WB_CLCO_NETWORK_ERROR', 'NETWORK_ERROR'].includes(code)) category = '네트워크 오류';
+        else if (code === 'WB_CLCO_SERVER_UNAVAILABLE') category = 'AI 서버 사용 불가';
+        else if (code === 'SUBJECT_SCOPE_UNVERIFIED') category = '계정·사건 범위 검증 실패';
+        else if (['ON_AI_INVALID_INPUT', 'ON_AI_INVALID_OUTPUT', 'WB_CLCO_INVALID_RESPONSE'].includes(code)) category = '요청 또는 응답 형식 오류';
         const suppliedMessage = input.error && input.error.message;
         const message = typeof suppliedMessage === 'string' && safeAiText(suppliedMessage, 500)
           ? suppliedMessage
@@ -692,11 +696,11 @@ export function createStudentView() {
         addText('p', `AI 연결 점검 실패: ${category}`, 'student-ai-error');
         addText('p', `오류 코드: ${code}`, 'student-ai-error-code');
         addText('p', `오류 내용: ${message}`, 'student-ai-error-message');
-        addText('p', '이 결과는 사건 설명 실행이 아닙니다. 자동 재점검은 하지 않으며, 다시 점검하려면 버튼을 직접 누르세요.', 'student-ai-separation');
+        addText('p', '이 결과는 사건 설명 요청의 실행 결과가 아닙니다. 자동 재점검은 하지 않습니다. 다시 점검하려면 버튼을 직접 누르세요.', 'student-ai-separation');
         return root;
       }
       if (status !== 'ok') {
-        addText('p', 'AI 연결 점검 상태를 확인할 수 없습니다. 이전 점검 결과를 현재 성공으로 표시하지 않습니다.', 'student-ai-unverified');
+        addText('p', 'AI 연결 점검의 처리 상태를 확인할 수 없습니다. 이전 점검 결과를 현재 성공으로 표시하지 않습니다.', 'student-ai-unverified');
         return root;
       }
 
@@ -707,17 +711,17 @@ export function createStudentView() {
       if (!data || typeof data !== 'object' || data.transportChecked !== true
           || !['test', 'verified'].includes(data.audienceAuthorization)
           || !Number.isInteger(data.modelCount) || data.modelCount < 0 || data.modelCount > 10000 || !validTime) {
-        addText('p', 'AI 연결 점검 결과의 형식이나 확인 시각을 검증할 수 없습니다. 연결 성공으로 판단하지 마세요.', 'student-ai-unverified');
+        addText('p', 'AI 연결 점검 응답이 공식 계약을 충족하지 않거나 점검 시각을 검증할 수 없습니다. 연결 성공으로 판단하지 마세요.', 'student-ai-unverified');
         return root;
       }
       const authorization = data.audienceAuthorization;
       addText('p', authorization === 'test'
-        ? '시험 transport 모델 응답 점검(test) · 실제 앱 권한이나 게이트 수용을 확인한 결과가 아닙니다.'
-        : '앱 권한 확인 후 모델 목록 응답 점검(verified) · 이 시점의 연결 확인입니다.', 'student-ai-result');
+        ? '시험용 전송 경로의 모델 목록 조회(test) · 실제 앱 권한이나 게이트 수용을 검증한 결과가 아닙니다.'
+        : '앱 권한 검증 후 모델 목록 조회(verified) · 표시된 점검 시점의 결과입니다.', 'student-ai-result');
       const details = document.createElement('dl');
       details.className = 'student-ai-check-details';
       const rows = [
-        ['응답 모델 수', String(data.modelCount)],
+        ['조회된 모델 수', String(data.modelCount)],
         ['점검 시각', `${new Date(checkedAt).toLocaleString('ko-KR')} (${checkedAt})`],
       ];
       for (const [label, value] of rows) {
@@ -728,7 +732,7 @@ export function createStudentView() {
         details.append(term, description);
       }
       root.appendChild(details);
-      addText('p', '이 결과는 현재 API 연결과 모델 목록 응답만 점검했습니다. 보안 사건 설명은 아직 실행하지 않았고, 실제 설명 결과는 보안 기록에서 별도로 요청·확인해야 합니다.', 'student-ai-separation');
+      addText('p', '이 결과는 점검 시점의 API 모델 목록 조회만 확인했습니다. 보안 사건 설명은 실행하지 않았으며, 설명 응답은 보안 기록에서 별도로 요청하고 검증해야 합니다.', 'student-ai-separation');
       return root;
     },
     renderExplanation(input = {}) {
@@ -753,27 +757,27 @@ export function createStudentView() {
         const message = typeof rawMessage === 'string' && safeAiText(rawMessage, 500) ? rawMessage : AI_MESSAGES[code];
         addText(root, 'p', `${title}: ${code}`, 'student-explanation-error');
         addText(root, 'p', message, 'student-explanation-error-message');
-        addText(root, 'p', '보안 기록은 그대로입니다. 이 설명 오류는 조치를 실행하지 않았습니다.', 'student-explanation-unchanged');
+        addText(root, 'p', '보안 기록은 변경되지 않았습니다. 설명 요청 실패로 조치는 실행되지 않았습니다.', 'student-explanation-unchanged');
       };
 
       if (!event) {
-        addText(root, 'p', '보안 기록에서 사건을 먼저 고르세요. 선택된 사건이 없으므로 설명을 표시하지 않습니다.', 'student-explanation-empty');
+        addText(root, 'p', '보안 기록에서 사건을 먼저 선택하세요. 선택된 사건이 없어 설명 결과를 표시할 수 없습니다.', 'student-explanation-empty');
         return root;
       }
       if (status === 'idle') {
-        addText(root, 'p', `사건 ${safeAiId(event.id) ? event.id : 'ID 확인 불가'}의 AI 설명은 아직 실행되지 않았습니다. 설명은 별도로 요청해야 합니다.`, 'student-explanation-idle');
+        addText(root, 'p', `사건 ${safeAiId(event.id) ? event.id : 'ID 확인 불가'}의 AI 설명 요청은 아직 실행되지 않았습니다. 설명 결과를 확인하려면 별도로 요청해야 합니다.`, 'student-explanation-idle');
         return root;
       }
       if (status === 'loading') {
-        addText(root, 'p', `사건 ${safeAiId(event.id) ? event.id : 'ID 확인 불가'}의 근거를 사용해 AI 설명을 요청하는 중입니다. 아직 설명 결과가 없습니다.`, 'student-explanation-loading');
+        addText(root, 'p', `사건 ${safeAiId(event.id) ? event.id : 'ID 확인 불가'}의 근거를 사용해 AI 설명 요청을 처리 중입니다. 응답을 검증하기 전에는 설명 결과가 아닙니다.`, 'student-explanation-loading');
         return root;
       }
       if (status === 'error') {
-        showFailure('AI 설명 실패', explanation.error);
+        showFailure('AI 설명 요청 실패', explanation.error);
         return root;
       }
       if (status !== 'ok') {
-        addText(root, 'p', 'AI 설명 상태를 확인할 수 없습니다. 이 상태를 성공으로 표시하지 않습니다.', 'student-explanation-unverified');
+        addText(root, 'p', 'AI 설명 요청의 처리 상태를 확인할 수 없습니다. 확인되지 않은 상태를 성공으로 표시하지 않습니다.', 'student-explanation-unverified');
         return root;
       }
 
@@ -784,17 +788,17 @@ export function createStudentView() {
         && ['active', 'expired', 'revoked', 'unknown'].includes(event.state.session)
         && ['compliant', 'noncompliant', 'unknown'].includes(event.state.device);
       if (!validated || !validState || !safeAiId(event.id)) {
-        addText(root, 'p', '이 AI 설명은 사용할 수 없습니다. 사건 근거·규칙과 설명 결과의 연결 또는 응답 형식이 맞지 않습니다.', 'student-explanation-rejected');
+        addText(root, 'p', '설명 응답이 공식 응답 계약을 충족하지 않거나 선택한 사건의 근거·조치와 일치하지 않아 표시할 수 없습니다.', 'student-explanation-rejected');
         addText(root, 'p', '오류 코드: ON_AI_INVALID_OUTPUT', 'student-explanation-error-code');
         addText(root, 'p', AI_MESSAGES.ON_AI_INVALID_OUTPUT, 'student-explanation-error-message');
-        addText(root, 'p', '보안 기록은 그대로이며 잘못된 설명으로 내용을 지어내지 않습니다.', 'student-explanation-unchanged');
+        addText(root, 'p', '보안 기록은 변경되지 않았으며, 계약 검증에 실패한 응답의 내용은 표시하지 않습니다.', 'student-explanation-unchanged');
         return root;
       }
 
       // 성공 표식은 선택된 사건과 검증된 설명이 정확히 결속된 경우에만 붙인다.
       root.setAttribute('data-student-explanation-event', event.id);
       addText(root, 'h3', `사건 ${event.id} · AI 설명(참고용)`, 'student-explanation-title');
-      addText(root, 'p', `원래 사건 요약: ${event.summary}`, 'student-explanation-event-summary');
+      addText(root, 'p', `원본 사건 요약: ${event.summary}`, 'student-explanation-event-summary');
       addText(root, 'p', validated.summary, 'student-explanation-summary');
       if (typeof input.checkedAt === 'string' && safeAiTime(input.checkedAt)) {
         addText(root, 'p', `설명 확인 시각: ${new Date(input.checkedAt).toLocaleString('ko-KR')} (${input.checkedAt})`, 'student-explanation-time');
