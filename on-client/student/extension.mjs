@@ -1,15 +1,15 @@
 // 이 파일은 학생이 같은 프로젝트에서 이어서 구현합니다.
 // 제공 UI를 받은 것만으로 단계 완료를 인정하지 않습니다.
 const AI_MESSAGES = Object.freeze({
-  ON_AI_PROVISIONING_PENDING: '학생 앱 이용 권한의 발급·연결을 준비 중입니다. 담당자에게 확인하세요.',
-  ON_AI_AUTHORIZATION_CHANGED: 'AI 이용 권한 내용이 점검 도중 바뀌었습니다. 담당자에게 현재 권한을 확인하세요.',
+  ON_AI_PROVISIONING_PENDING: '「계정 연결 확인」에서 현재 계정 연결을 다시 확인하고, 학생 앱 AI 이용 권한의 발급·연결 상태는 담당자에게 확인하세요.',
+  ON_AI_AUTHORIZATION_CHANGED: 'AI 이용 권한 내용이 점검 도중 바뀌었습니다. 「계정 연결 확인」에서 현재 계정 연결을 다시 확인하고, 담당자에게 현재 권한을 확인하세요.',
   ON_AI_MODEL_LIST_EMPTY: '현재 앱 권한으로 쓸 수 있는 AI 모델이 없습니다. 담당자에게 모델 허용 설정을 확인하세요.',
   ON_AI_INVALID_INPUT: '설명에 필요한 사건 근거·규칙을 확인할 수 없습니다.',
   ON_AI_INVALID_OUTPUT: 'AI 설명의 근거·조치·응답 형식을 확인할 수 없습니다.',
   ON_AI_TRANSPORT_PENDING: '공통 AI 연결 모듈을 준비 중입니다. 담당자에게 확인하세요.',
-  WB_CLCO_AUTH_REQUIRED: '앱 전용 인증을 확인하세요. Workbench 열쇠를 복사하지 마세요.',
-  WB_CLCO_INVALID_TOKEN: '앱 전용 인증 정보를 확인하세요. 열쇠를 화면에 입력하지 마세요.',
-  WB_CLCO_ACCESS_BLOCKED: '학생 앱의 이용 권한을 확인하세요.',
+  WB_CLCO_AUTH_REQUIRED: '앱 전용 인증에 실패했습니다. 「계정 연결 확인」에서 현재 계정 연결을 다시 확인하고, 계속되면 담당자에게 앱 전용 인증 상태를 문의하세요. Workbench 열쇠를 복사하지 마세요.',
+  WB_CLCO_INVALID_TOKEN: '앱 전용 인증 정보를 확인할 수 없습니다. 「계정 연결 확인」에서 현재 계정 연결을 다시 확인하고, 계속되면 담당자에게 확인하세요. 열쇠를 화면에 입력하지 마세요.',
+  WB_CLCO_ACCESS_BLOCKED: '「계정 연결 확인」에서 현재 계정 연결을 다시 확인한 뒤, 담당자에게 학생 앱 AI 이용 권한을 확인하세요.',
   WB_CLCO_COHORT_BUDGET_EXHAUSTED: '반의 AI 사용량이 소진됐습니다. 담당자에게 확인하세요.',
   WB_CLCO_RATE_LIMITED: 'AI 요청이 잠시 제한됐습니다. 잠시 후 직접 다시 요청하세요.',
   WB_CLCO_LIMIT_REACHED: 'AI 이용 한도에 도달했습니다. 담당자에게 확인하세요.',
@@ -697,6 +697,11 @@ export function createStudentView() {
         addText('p', `AI 연결 점검 실패: ${category}`, 'student-ai-error');
         addText('p', `오류 코드: ${code}`, 'student-ai-error-code');
         addText('p', `오류 내용: ${message}`, 'student-ai-error-message');
+        if (['WB_CLCO_AUTH_REQUIRED', 'WB_CLCO_INVALID_TOKEN'].includes(code)) {
+          addText('p', '「계정 연결 확인」에서 현재 계정 연결을 다시 확인하세요. 인증 오류가 계속되면 담당자에게 앱 전용 인증 상태를 문의하세요. Workbench 열쇠를 복사하거나 입력하지 마세요.', 'student-ai-error-guidance');
+        } else if (['ON_AI_PROVISIONING_PENDING', 'ON_AI_AUTHORIZATION_CHANGED', 'WB_CLCO_ACCESS_BLOCKED'].includes(code)) {
+          addText('p', '「계정 연결 확인」에서 현재 계정 연결을 다시 확인한 뒤, 문제가 계속되면 담당자에게 학생 앱 AI 이용 권한의 발급·연결 상태를 문의하세요.', 'student-ai-error-guidance');
+        }
         addText('p', '이 결과는 사건 설명 요청의 실행 결과가 아닙니다. 자동 재점검은 하지 않습니다. 다시 점검하려면 버튼을 직접 누르세요.', 'student-ai-separation');
         return root;
       }
