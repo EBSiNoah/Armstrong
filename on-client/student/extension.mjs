@@ -42,7 +42,8 @@ const safeAiTime = value => typeof value === 'string'
 const exactFields = (value, names) => value !== null && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).length === names.length && names.every(name => Object.hasOwn(value, name));
 function validExplanation(data, event) {
-  const explanation = exactFields(data, ['explanation']) ? data.explanation : null;
+  // 제공 UI는 검증된 설명 객체를 resource.data에 직접 전달한다.
+  const explanation = data;
   if (!exactFields(explanation, ['summary', 'evidenceIds', 'proposals', 'requiresHumanConfirmation', 'executed'])
     || !safeAiId(event && event.id) || !Array.isArray(event.evidence) || !Array.isArray(event.rules)
     || !Array.isArray(event.supportedActions)) return null;
@@ -705,8 +706,8 @@ export function createStudentView() {
       }
 
       const data = input.data;
-      // 공식 API 자원 계약의 점검 시각은 resource.meta.checkedAt에만 있다.
-      const checkedAt = meta.checkedAt;
+      // 학생 UI 입력 계약은 checkedAt을 최상위 필드로 전달한다.
+      const checkedAt = input.checkedAt;
       const validTime = typeof checkedAt === 'string' && safeAiTime(checkedAt);
       if (!data || typeof data !== 'object' || data.transportChecked !== true
           || !['test', 'verified'].includes(data.audienceAuthorization)
