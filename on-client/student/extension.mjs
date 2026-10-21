@@ -383,21 +383,19 @@ export function createStudentView() {
         addText(states, 'p', `기기(device): ${stateText('device', state.device)}`, 'student-event-device-state');
         detail.appendChild(states);
 
-        // 명시적으로 입력된 조치 중 지원 목록에 없는 항목만 알린다. 조치 요청은 보내지 않는다.
-        const supportedActions = new Set(Array.isArray(selected.supportedActions)
-          ? selected.supportedActions.filter((action) => typeof action === 'string' && action.trim())
-          : []);
-        const actionInputs = [
-          ...(Array.isArray(selected.unsupportedActions) ? selected.unsupportedActions : []),
-          ...(typeof selected.action === 'string' ? [selected.action] : []),
-        ];
-        const unsupportedActions = [...new Set(actionInputs.filter((action) =>
-          typeof action === 'string' && action.trim() && !supportedActions.has(action)))];
-        if (unsupportedActions.length > 0) {
+        // supportedActions에 전달된 항목은 실행 연결 전까지 비활성으로만 표시한다. 조치 요청은 보내지 않는다.
+        const actionsFromInput = Array.isArray(selected.supportedActions)
+          ? selected.supportedActions
+            .filter((action) => typeof action === 'string' && action.trim())
+            .map((action) => action.trim())
+          : [];
+        const actionsToShow = [...new Set(actionsFromInput)];
+        if (actionsToShow.length > 0) {
           const actions = document.createElement('section');
           actions.className = 'student-event-actions';
           addText(actions, 'h4', '조치');
-          for (const action of unsupportedActions) {
+          addText(actions, 'p', '조치 실행 연결은 아직 지원하지 않습니다. 기능 준비 중이며 조치 요청은 전송되지 않습니다.');
+          for (const action of actionsToShow) {
             const button = document.createElement('button');
             button.type = 'button';
             button.textContent = `${action} 미지원`;
@@ -494,6 +492,7 @@ export function createStudentView() {
       const diagnosticSection = document.createElement('section');
       diagnosticSection.className = 'student-status-diagnostics';
       addText(diagnosticSection, 'h3', '진단 정보');
+      addText(diagnosticSection, 'p', '담당자에게 도움을 요청할 때 전달하기 위한 정보입니다. 표시된 진단 항목만 복사해 전달하세요.', 'student-diagnostics-purpose');
       let diagnosticInfo = null;
       if (diagnostics && diagnostics.status === 'loading') {
         addText(diagnosticSection, 'p', '진단 정보 조회 중입니다.', 'student-loading', 'status');
@@ -547,9 +546,9 @@ export function createStudentView() {
         if (!diagnosticInfo) return;
         try {
           await navigator.clipboard.writeText(JSON.stringify(diagnosticInfo, null, 2));
-          helpCopyStatus = '도움정보를 클립보드에 복사했습니다.';
+          helpCopyStatus = '도움정보를 클립보드에 복사했습니다. 담당자에게 도움을 요청할 때 전달하세요.';
         } catch {
-          helpCopyStatus = '클립보드 복사에 실패했습니다. 표시된 진단 항목을 직접 선택해 복사하세요.';
+          helpCopyStatus = '클립보드 복사에 실패했습니다. 담당자에게 도움을 요청할 때 표시된 진단 항목을 직접 선택해 복사하세요.';
         }
         copyStatus.textContent = helpCopyStatus;
       });
