@@ -32,12 +32,12 @@ const AI_MESSAGES = Object.freeze({
   SUBJECT_SCOPE_UNVERIFIED: '현재 로그인과 사건·프로젝트의 연결을 확인할 수 없습니다.',
   AI_REQUEST_UNVERIFIED: 'AI 연결 또는 응답을 확인할 수 없습니다. 기존 기록을 확인하세요.',
 });
-const AI_SECRET = /(?:Bearer\\s+\\S+|sk-(?:proj-|ant-|svcacct-)?[A-Za-z0-9_-]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_ -]?key|authorization|password|비밀번호|토큰)\\s*[:=]\\s*\\S+)/i;
+const AI_SECRET = /(?:Bearer\s+\S+|sk-(?:proj-|ant-|svcacct-)?[A-Za-z0-9_-]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_ -]?key|authorization|password|비밀번호|토큰)\s*[:=]\s*\S+)/i;
 const safeAiText = (value, max) => typeof value === 'string' && value.trim().length > 0 && value.length <= max
-  && !AI_SECRET.test(value) && !/[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]/.test(value);
+  && !AI_SECRET.test(value) && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value);
 const safeAiId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(value) && !AI_SECRET.test(value);
 const safeAiTime = value => typeof value === 'string'
-  && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value)
+  && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
   && Number.isFinite(Date.parse(value));
 const exactFields = (value, names) => value !== null && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).length === names.length && names.every(name => Object.hasOwn(value, name));
@@ -701,7 +701,8 @@ export function createStudentView() {
       }
 
       const data = input.data;
-      const checkedAt = typeof input.checkedAt === 'string' ? input.checkedAt : meta.checkedAt;
+      // 공식 API 자원 계약의 점검 시각은 resource.meta.checkedAt에만 있다.
+      const checkedAt = meta.checkedAt;
       const validTime = typeof checkedAt === 'string' && safeAiTime(checkedAt);
       if (!data || typeof data !== 'object' || data.transportChecked !== true
           || !['test', 'verified'].includes(data.audienceAuthorization)
