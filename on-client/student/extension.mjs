@@ -428,10 +428,11 @@ export function createStudentView() {
         '오류 내용을 확인할 수 없습니다.',
       );
 
-      const renderListResource = (name, resource, emptyText, describe) => {
+      const renderListResource = (name, resource, emptyText, describe, scopeText = '') => {
         const section = document.createElement('section');
         section.className = 'student-status-resource';
         addText(section, 'h3', name);
+        if (scopeText) addText(section, 'p', scopeText, 'student-status-scope');
         if (resource && resource.status === 'loading') {
           addText(section, 'p', `${name} 조회 중입니다.`, 'student-loading', 'status');
         } else if (resource && resource.status === 'error') {
@@ -478,10 +479,16 @@ export function createStudentView() {
         const value = row && typeof row === 'object' ? row : {};
         return `${showValue(value.label)} · ID: ${showValue(value.id)} · ${labeledState(deviceLabels, value.status)}`;
       });
-      renderListResource('세션', input.sessions, '조회된 세션이 없습니다.', (row) => {
-        const value = row && typeof row === 'object' ? row : {};
-        return `ID: ${showValue(value.id)} · ${labeledState(sessionLabels, value.status)}`;
-      });
+      renderListResource(
+        '세션',
+        input.sessions,
+        '현재 검증된 연결이 없습니다. 과거 세션 목록은 이 화면에서 조회하지 않습니다.',
+        (row) => {
+          const value = row && typeof row === 'object' ? row : {};
+          return `ID: ${showValue(value.id)} · ${labeledState(sessionLabels, value.status)}`;
+        },
+        '조회 범위: 현재 검증된 연결 한 개입니다. 과거 세션 전체 목록은 아닙니다.',
+      );
 
       const diagnostics = input.diagnostics;
       const diagnosticSection = document.createElement('section');
