@@ -551,7 +551,124 @@ export function createStudentView() {
       root.appendChild(notificationsSection);
       return root;
     },
-    renderVulnerabilities() { return '학생 구현 대기: 정확한 설치 버전·OSV 출처·조회 시각·부분 결과·조회 실패를 구분하세요.'; },
+    renderVulnerabilities(input = {}) {
+      const root = document.createElement('div');
+      root.className = 'student-vulnerabilities';
+      const addText = (parent, tag, value, className) => {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        node.textContent = String(value);
+        parent.appendChild(node);
+        return node;
+      };
+      const state = input && ['idle', 'loading', 'error', 'ok'].includes(input.status)
+        ? input.status : 'unknown';
+      root.dataset.state = state;
+      const scanLabels = {
+        complete: '전체 조회 완료',
+        partial: '일부 패키지 조회 확인 불가',
+        not_checked: '승인된 패키지를 조회하지 않음',
+        not_configured: '프로젝트가 설정되지 않음',
+        unverifiable: 'lockfile 또는 설치 정보를 확인할 수 없음',
+      };
+      const packageLabels = {
+        known_vulnerabilities: '조회 범위에서 알려진 항목 있음',
+        none_found: '조회 범위에서 알려진 항목 없음',
+        unverifiable: '조회 결과 확인 불가',
+      };
+      const showField = (parent, label, value) => {
+        if (value === undefined || value === null) return;
+        if (typeof value !== 'string' && typeof value !== 'number') return;
+        addText(parent, 'p', `${label}: ${value}`, `student-vulnerability-${label}`);
+      };
+
+      if (state === 'idle') {
+        addText(root, 'p', '정확한 설치 버전의 패키지 조회를 아직 시작하지 않았습니다.', 'student-vulnerabilities-idle');
+        return root;
+      }
+      if (state === 'loading') {
+        addText(root, 'p', 'package-lock.json과 설치된 node_modules의 패키지 메타데이터를 대조하고 OSV를 조회 중입니다.', 'student-vulnerabilities-loading');
+        addText(root, 'p', '조회가 끝나기 전에는 이전 표를 현재 결과로 표시하지 않습니다.', 'student-vulnerabilities-not-current');
+        return root;
+      }
+      if (state === 'error') {
+        const error = input.error && typeof input.error === 'object' ? input.error : {};
+        const code = typeof error.code === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(error.code) ? error.code : null;
+        addText(root, 'p', '패키지 조회에 실패했습니다. 이번 요청에서 확인한 결과가 아닙니다.', 'student-vulnerabilities-error');
+        if (code) addText(root, 'p', `오류 코드: ${code}`, 'student-vulnerabilities-error-code');
+        addText(root, 'p', typeof error.message === 'string' && error.message.trim()
+          ? error.message : '오류 내용을 확인할 수 없습니다.', 'student-vulnerabilities-error-message');
+        addText(root, 'p', '이전 표를 현재 조회 결과로 표시하지 않습니다. 다시 조회하려면 제공 화면의 조회 버튼을 직접 누르세요.', 'student-vulnerabilities-not-current');
+        return root;
+      }
+      const data = input.data;
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        root.dataset.state = 'error';
+        addText(root, 'p', '패키지 조회 응답 형식을 확인할 수 없습니다. 이전 표를 표시하지 않습니다.', 'student-vulnerabilities-unverified');
+        return root;
+      }
+
+      addText(root, 'p', '전체 결과는 package-lock.json과 설치된 node_modules의 package.json 메타데이터를 대조한 값입니다. OSV 조회는 표시된 정확한 패키지 이름과 버전을 대상으로 합니다.', 'student-vulnerabilities-scope');
+      const scanStatus = typeof data.status === 'string' ? data.status : 'unknown';
+      const scanDescription = Object.hasOwn(scanLabels, scanStatus) ? scanLabels[scanStatus] : '분류할 수 없는 상태';
+      addText(root, 'p', `전체 상태: ${scanDescription} (${scanStatus})`, 'student-vulnerabilities-scan-status');
+      if (Object.hasOwn(data, 'code') && typeof data.code === 'string') showField(root, '코드', data.code);
+      if (Object.hasOwn(data, 'lockfileVersion')) showField(root, 'lockfileVersion', data.lockfileVersion);
+      if (Object.hasOwn(data, 'lockfileHash')) showField(root, 'lockfileHash', data.lockfileHash);
+      if (Object.hasOwn(data, 'checkedAt')) showField(root, 'checkedAt', data.checkedAt);
+      addText(root, 'p', 'none_found는 조회한 정확한 패키지 버전의 OSV 조회 범위에서 알려진 항목을 찾지 못했다는 뜻입니다. 모든 취약점이 없거나 패키지가 안전하다는 판정은 아닙니다.', 'student-vulnerabilities-none-found-note');
+
+      if (!Array.isArray(data.packages)) {
+        addText(root, 'p', '패키지별 결과 목록을 확인할 수 없습니다.', 'student-vulnerabilities-unverified');
+        return root;
+      }
+      if (data.packages.length === 0) {
+        if (scanStatus === 'not_checked') addText(root, 'p', '승인된 공개 패키지가 없어 OSV 조회를 수행하지 않았습니다.', 'student-vulnerabilities-empty');
+        else if (scanStatus === 'not_configured') addText(root, 'p', '프로젝트 연결이 설정되지 않아 패키지 조회를 수행하지 않았습니다.', 'student-vulnerabilities-empty');
+        else addText(root, 'p', '표시할 패키지 조회 결과가 없습니다.', 'student-vulnerabilities-empty');
+        return root;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'student-vulnerability-table';
+      const head = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      for (const label of ['패키지', '정확한 version', '패키지 상태', 'OSV source', '패키지 checkedAt', '취약점 ID', 'modified']) {
+        addText(headerRow, 'th', label);
+      }
+      head.appendChild(headerRow);
+      table.appendChild(head);
+      const body = document.createElement('tbody');
+      for (const pkg of data.packages) {
+        if (!pkg || typeof pkg !== 'object' || Array.isArray(pkg)) continue;
+        const findings = Array.isArray(pkg.vulnerabilities) && pkg.vulnerabilities.length > 0
+          ? pkg.vulnerabilities : [null];
+        const packageStatus = typeof pkg.status === 'string' ? pkg.status : 'unknown';
+        const packageDescription = Object.hasOwn(packageLabels, packageStatus)
+          ? packageLabels[packageStatus] : '분류할 수 없는 상태';
+        for (const finding of findings) {
+          const row = document.createElement('tr');
+          row.className = 'student-vulnerability-row';
+          if (typeof pkg.name === 'string') row.setAttribute('data-student-package-name', pkg.name);
+          if (typeof pkg.version === 'string') row.setAttribute('data-student-package-version', pkg.version);
+          addText(row, 'td', typeof pkg.name === 'string' ? pkg.name : '');
+          addText(row, 'td', typeof pkg.version === 'string' ? pkg.version : '');
+          addText(row, 'td', `${packageDescription} (${packageStatus})`);
+          addText(row, 'td', typeof pkg.source === 'string' ? pkg.source : '');
+          addText(row, 'td', typeof pkg.checkedAt === 'string' ? pkg.checkedAt : '');
+          addText(row, 'td', finding && typeof finding.id === 'string' ? finding.id : '');
+          addText(row, 'td', finding && typeof finding.modified === 'string' ? finding.modified : '');
+          body.appendChild(row);
+        }
+      }
+      table.appendChild(body);
+      root.appendChild(table);
+      if (data.packages.some(pkg => pkg && pkg.status === 'unverifiable'
+        && Array.isArray(pkg.vulnerabilities) && pkg.vulnerabilities.length > 0)) {
+        addText(root, 'p', '일부 패키지 조회를 끝까지 확인하지 못했지만, 그 전에 받은 취약점 ID와 modified는 보존해 표시했습니다.', 'student-vulnerabilities-partial-findings');
+      }
+      return root;
+    },
     renderAiConnection(input = {}) {
       const root = document.createElement('div'); root.className = 'student-ai-connection';
       const status = input && typeof input.status === 'string' ? input.status : 'unknown'; root.dataset.state = status;
