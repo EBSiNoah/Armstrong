@@ -47,7 +47,11 @@ function validExplanation(data, event) {
   if (!exactFields(explanation, ['summary', 'evidenceIds', 'proposals', 'requiresHumanConfirmation', 'executed'])
     || !safeAiId(event && event.id) || !Array.isArray(event.evidence) || !Array.isArray(event.rules)
     || !Array.isArray(event.supportedActions)) return null;
-  const evidenceIds = new Set(event.evidence.map(row => row && row.id));
+  const validRows = rows => rows.every(row => row && safeAiId(row.id) && safeAiText(row.text, 500));
+  if (!validRows(event.evidence) || !validRows(event.rules)
+    || new Set(event.evidence.map(row => row.id)).size !== event.evidence.length
+    || new Set(event.rules.map(row => row.id)).size !== event.rules.length) return null;
+  const evidenceIds = new Set(event.evidence.map(row => row.id));
   const references = refs => Array.isArray(refs) && refs.length > 0 && new Set(refs).size === refs.length
     && refs.every(ref => safeAiId(ref) && evidenceIds.has(ref));
   if (!safeAiText(explanation.summary, 1500) || !references(explanation.evidenceIds)
@@ -744,8 +748,10 @@ export function createStudentView() {
     renderExplanation(input = {}) {
       const root = document.createElement('div');
       root.className = 'student-explanation';
-      const explanation = input && input.explanation && typeof input.explanation === 'object' ? input.explanation : {};
-      const event = input && input.event && typeof input.event === 'object' ? input.event : null;
+      const explanation = input && input.explanation && typeof input.explanation === 'object' && !Array.isArray(input.explanation)
+        ? input.explanation : {};
+      const event = input && input.event && typeof input.event === 'object' && !Array.isArray(input.event)
+        ? input.event : null;
       const status = typeof explanation.status === 'string' ? explanation.status : 'unknown';
       root.dataset.state = status;
       const addText = (parent, tag, value, className) => {
@@ -755,31 +761,52 @@ export function createStudentView() {
         parent.appendChild(node);
         return node;
       };
-      const showFailure = (title, error) => {
-        const knownCodes = Object.keys(AI_MESSAGES);
+      const knownErrorCode = error => {
         const rawCode = error && error.code;
-        const code = typeof rawCode === 'string' && knownCodes.includes(rawCode) ? rawCode : 'AI_REQUEST_UNVERIFIED';
+        return typeof rawCode === 'string' && Object.hasOwn(AI_MESSAGES, rawCode) ? rawCode : null;
+      };
+      const safeErrorMessage = (error, code) => {
         const rawMessage = error && error.message;
-        const message = typeof rawMessage === 'string' && safeAiText(rawMessage, 500) ? rawMessage : AI_MESSAGES[code];
-        addText(root, 'p', `${title}: ${code}`, 'student-explanation-error');
-        addText(root, 'p', message, 'student-explanation-error-message');
-        addText(root, 'p', '보안 기록은 변경되지 않았습니다. 설명 요청 실패로 조치는 실행되지 않았습니다.', 'student-explanation-unchanged');
+        return typeof rawMessage === 'string' && safeAiText(rawMessage, 500)
+          ? rawMessage
+          : AI_MESSAGES[code];
+      };
+      const failureReasons = {
+        ON_AI_INVALID_INPUT: '선택한 사건의 근거 또는 규칙이 없거나, 설명 요청에 필요한 형식으로 확인되지 않았습니다.',
+        ON_AI_INVALID_OUTPUT: '응답이 검증 가능한 근거·조치·응답 형식을 충족하지 않았습니다.',
+        SUBJECT_SCOPE_UNVERIFIED: '현재 로그인 사용자와 선택한 사건의 연결 범위를 확인하지 못했습니다.',
+        AI_REQUEST_UNVERIFIED: '요청 또는 응답의 유효성을 확인하지 못해 설명을 검증할 수 없습니다.',
+      };
+      const showError = error => {
+        const code = knownErrorCode(error) || 'AI_REQUEST_UNVERIFIED';
+        addText(root, 'p', `AI 설명 실패: ${code}`, 'student-explanation-error');
+        addText(root, 'p', `오류 메시지: ${safeErrorMessage(error, code)}`, 'student-explanation-error-message');
+        addText(root, 'p', `실패 이유: ${failureReasons[code] || '오류 코드별 세부 원인을 분류할 수 없습니다. 표시된 오류 코드와 메시지를 확인하세요.'}`, 'student-explanation-failure-reason');
+        addText(root, 'p', '기록은 그대로입니다. 설명은 검증되지 않았고 조치는 실행되지 않았습니다.', 'student-explanation-unchanged');
+      };
+      const showRejected = (reason, error = explanation.error) => {
+        addText(root, 'p', '설명을 사용할 수 없습니다.', 'student-explanation-rejected');
+        const code = knownErrorCode(error);
+        if (code) addText(root, 'p', `오류 코드: ${code}`, 'student-explanation-error-code');
+        addText(root, 'p', `실패 이유: ${reason}`, 'student-explanation-failure-reason');
+        addText(root, 'p', '기록은 그대로입니다. 검증되지 않은 설명은 표시하지 않았고 조치는 실행되지 않았습니다.', 'student-explanation-unchanged');
       };
 
+      // 실패를 사건 선택 여부보다 먼저 처리한다. 매 호출마다 새 root를 만들고, 성공 이외에는 성공 속성을 설정하지 않는다.
+      if (status === 'error') {
+        showError(explanation.error);
+        return root;
+      }
       if (!event) {
-        addText(root, 'p', '보안 기록에서 사건을 먼저 선택하세요. 선택된 사건이 없어 설명 결과를 표시할 수 없습니다.', 'student-explanation-empty');
+        addText(root, 'p', '보안 기록에서 기록을 먼저 고르세요.', 'student-explanation-empty');
         return root;
       }
       if (status === 'idle') {
-        addText(root, 'p', `사건 ${safeAiId(event.id) ? event.id : 'ID 확인 불가'}의 AI 설명 요청은 아직 실행되지 않았습니다. 설명 결과를 확인하려면 별도로 요청해야 합니다.`, 'student-explanation-idle');
+        addText(root, 'p', `사건 ${safeAiId(event.id) ? event.id : 'ID 확인 불가'}의 AI 설명 요청은 아직 실행되지 않았습니다.`, 'student-explanation-idle');
         return root;
       }
       if (status === 'loading') {
-        addText(root, 'p', `사건 ${safeAiId(event.id) ? event.id : 'ID 확인 불가'}의 근거를 사용해 AI 설명 요청을 처리 중입니다. 응답을 검증하기 전에는 설명 결과가 아닙니다.`, 'student-explanation-loading');
-        return root;
-      }
-      if (status === 'error') {
-        showFailure('AI 설명 요청 실패', explanation.error);
+        addText(root, 'p', `사건 ${safeAiId(event.id) ? event.id : 'ID 확인 불가'}의 AI 설명 요청을 처리 중입니다. 응답을 검증하기 전에는 설명 결과가 아닙니다.`, 'student-explanation-loading');
         return root;
       }
       if (status !== 'ok') {
@@ -787,24 +814,47 @@ export function createStudentView() {
         return root;
       }
 
-      const data = explanation.data;
-      const validated = validExplanation(data, event);
-      const validState = event.state && typeof event.state === 'object'
-        && ['allowed', 'denied', 'unknown'].includes(event.state.access)
-        && ['active', 'expired', 'revoked', 'unknown'].includes(event.state.session)
-        && ['compliant', 'noncompliant', 'unknown'].includes(event.state.device);
-      if (!validated || !validState || !safeAiId(event.id)) {
-        addText(root, 'p', '설명 응답이 공식 응답 계약을 충족하지 않거나 선택한 사건의 근거·조치와 일치하지 않아 표시할 수 없습니다.', 'student-explanation-rejected');
-        addText(root, 'p', '오류 코드: ON_AI_INVALID_OUTPUT', 'student-explanation-error-code');
-        addText(root, 'p', AI_MESSAGES.ON_AI_INVALID_OUTPUT, 'student-explanation-error-message');
-        addText(root, 'p', '보안 기록은 변경되지 않았으며, 계약 검증에 실패한 응답의 내용은 표시하지 않습니다.', 'student-explanation-unchanged');
+      const data = explanation.data && typeof explanation.data === 'object' && !Array.isArray(explanation.data)
+        ? explanation.data : null;
+      if (data && data.executed === true) {
+        showRejected('AI가 이미 실행했다고 답한 설명은 사용할 수 없습니다.', explanation.error);
+        return root;
+      }
+      if (!safeAiId(event.id)) {
+        showRejected('선택한 보안 기록의 ID를 검증할 수 없습니다.', explanation.error);
         return root;
       }
 
-      // 성공 표식은 선택된 사건과 검증된 설명이 정확히 결속된 경우에만 붙인다.
+      // 인용 ID를 현재 기록의 실제 근거와 먼저 대조한다. 찾지 못한 ID나 근거 문장은 만들지 않는다.
+      const eventEvidence = Array.isArray(event.evidence) ? event.evidence : [];
+      const evidenceById = new Map(eventEvidence
+        .filter(row => row && safeAiId(row.id) && safeAiText(row.text, 500))
+        .map(row => [row.id, row]));
+      const citedEvidenceIds = data && Array.isArray(data.evidenceIds) ? data.evidenceIds : null;
+      if (citedEvidenceIds && citedEvidenceIds.some(id => !evidenceById.has(id))) {
+        showRejected('근거가 맞지 않습니다. 설명의 근거 ID가 선택한 기록의 근거와 일치하지 않아 내용을 표시할 수 없습니다.', explanation.error);
+        return root;
+      }
+      if (!citedEvidenceIds || citedEvidenceIds.length === 0) {
+        showRejected('근거가 부족합니다. 설명에 사용할 근거 ID가 없어 내용을 검증할 수 없습니다.', explanation.error);
+        return root;
+      }
+
+      const validated = validExplanation(data, event);
+      if (!validated) {
+        const suppliedCode = knownErrorCode(explanation.error);
+        if (suppliedCode) addText(root, 'p', `오류 코드: ${suppliedCode}`, 'student-explanation-error-code');
+        else addText(root, 'p', '오류 코드: ON_AI_INVALID_OUTPUT', 'student-explanation-error-code');
+        addText(root, 'p', '설명 응답이 계약을 충족하지 않거나 근거·조치가 선택한 기록과 일치하지 않아 표시할 수 없습니다.', 'student-explanation-rejected');
+        addText(root, 'p', '실패 이유: 응답의 근거 ID·규칙·조치 형식을 검증할 수 없습니다.', 'student-explanation-failure-reason');
+        addText(root, 'p', '기록은 그대로입니다. 검증되지 않은 설명은 표시하지 않았고 조치는 실행되지 않았습니다.', 'student-explanation-unchanged');
+        return root;
+      }
+
+      // 성공 표식은 사건 ID와 응답의 근거·조치가 모두 검증된 경우에만 부여한다.
       root.setAttribute('data-student-explanation-event', event.id);
-      addText(root, 'h3', `사건 ${event.id} · AI 설명(참고용)`, 'student-explanation-title');
-      addText(root, 'p', `원본 사건 요약: ${event.summary}`, 'student-explanation-event-summary');
+      addText(root, 'h3', 'AI 설명(참고용)', 'student-explanation-title');
+      addText(root, 'p', `사건 ID: ${event.id}`, 'student-explanation-event-id');
       addText(root, 'p', validated.summary, 'student-explanation-summary');
       if (typeof input.checkedAt === 'string' && safeAiTime(input.checkedAt)) {
         addText(root, 'p', `설명 확인 시각: ${new Date(input.checkedAt).toLocaleString('ko-KR')} (${input.checkedAt})`, 'student-explanation-time');
@@ -813,13 +863,18 @@ export function createStudentView() {
       const evidenceSection = document.createElement('section');
       evidenceSection.className = 'student-explanation-evidence';
       addText(evidenceSection, 'h4', '인용 근거');
-      const evidenceById = new Map(event.evidence.map((row) => [row.id, row]));
       const evidenceList = document.createElement('ul');
       for (const evidenceId of validated.evidenceIds) {
         const evidence = evidenceById.get(evidenceId);
+        // validExplanation에서도 대조하지만, 표시 직전에도 원천 근거가 있는지 확인한다.
+        if (!evidence) continue;
         const item = document.createElement('li');
         item.textContent = `${evidence.id} — ${evidence.text}`;
         evidenceList.appendChild(item);
+      }
+      if (evidenceList.childElementCount === 0) {
+        showRejected('근거가 맞지 않습니다. 현재 기록에서 인용 근거를 찾을 수 없어 설명을 사용할 수 없습니다.', explanation.error);
+        return root;
       }
       evidenceSection.appendChild(evidenceList);
       root.appendChild(evidenceSection);
@@ -833,7 +888,8 @@ export function createStudentView() {
         item.textContent = `${rule.id} — ${rule.text}`;
         rulesList.appendChild(item);
       }
-      rulesSection.appendChild(rulesList);
+      if (rulesList.childElementCount === 0) addText(rulesSection, 'p', '없음');
+      else rulesSection.appendChild(rulesList);
       root.appendChild(rulesSection);
 
       const stateLabels = {
@@ -842,18 +898,25 @@ export function createStudentView() {
         device: { compliant: '기준 충족', noncompliant: '기준 미충족', unknown: '확인 불가' },
       };
       const stateNames = { access: '접속', session: '세션', device: '기기' };
+      const state = event.state && typeof event.state === 'object' && !Array.isArray(event.state) ? event.state : {};
       const stateSection = document.createElement('section');
       stateSection.className = 'student-explanation-states';
-      addText(stateSection, 'h4', '사건의 원천 상태');
+      addText(stateSection, 'h4', '사건 상태');
+      const unknownStates = [];
       for (const key of ['access', 'session', 'device']) {
-        const value = event.state[key];
-        addText(stateSection, 'p', `${stateNames[key]}: ${stateLabels[key][value]}(${value})`,
-          value === 'unknown' ? 'student-explanation-state-unknown' : 'student-explanation-state');
+        const value = state[key];
+        if (value === 'unknown') {
+          unknownStates.push(stateNames[key]);
+          addText(stateSection, 'p', `${stateNames[key]}: 확인 불가(unknown)`, 'student-explanation-state-unknown');
+        } else if (typeof value === 'string' && Object.hasOwn(stateLabels[key], value)) {
+          addText(stateSection, 'p', `${stateNames[key]}: ${stateLabels[key][value]}(${value})`, 'student-explanation-state');
+        } else {
+          addText(stateSection, 'p', `${stateNames[key]}: 없음`, 'student-explanation-state');
+        }
       }
-      const unknownStates = ['access', 'session', 'device'].filter((key) => event.state[key] === 'unknown');
       addText(stateSection, 'p', unknownStates.length
-        ? `확인 불가 상태: ${unknownStates.map((key) => `${stateNames[key]}(unknown)`).join(', ')}. 정상·안전으로 간주하지 않습니다.`
-        : '확인 불가 상태: 없음.', 'student-explanation-unknown-summary');
+        ? `확인할 수 없는 상태: ${unknownStates.join(', ')}. 정상·안전으로 간주하지 않습니다.`
+        : '확인할 수 없는 상태: 없음.', 'student-explanation-unknown-summary');
       root.appendChild(stateSection);
 
       const proposalSection = document.createElement('section');
@@ -861,16 +924,17 @@ export function createStudentView() {
       addText(proposalSection, 'h4', 'AI 조치 제안');
       if (validated.proposals.length === 0) {
         addText(proposalSection, 'p', event.supportedActions.length === 0
-          ? '원천이 지원하는 조치가 없어 제안이 없습니다. 이는 조치 제안이 없는 상태이며, 사건이 정상·안전하다는 판정은 아닙니다.'
-          : 'AI가 제안한 조치가 없습니다.', 'student-explanation-no-proposals');
+          ? '연동 시스템이 지원하는 조치가 없어 제안이 없습니다(정상). 이는 사건이 정상·안전하다는 판정이 아닙니다.'
+          : 'AI가 제안한 조치가 없습니다. 이는 사건이 정상·안전하다는 판정이 아닙니다.', 'student-explanation-no-proposals');
+        addText(proposalSection, 'p', '제안된 조치는 없으며 아무 조치도 실행되지 않았습니다.', 'student-explanation-proposal-not-executed');
       } else {
-        addText(proposalSection, 'p', '아래 내용은 제안일 뿐이며 사람이 확인해야 합니다. 어떤 조치도 아직 실행되지 않았습니다.', 'student-explanation-proposal-not-executed');
         const proposals = document.createElement('ul');
         for (const proposal of validated.proposals) {
           const item = document.createElement('li');
           addText(item, 'p', `조치: ${proposal.action}`);
           addText(item, 'p', `제안 이유: ${proposal.reason}`);
           addText(item, 'p', `근거 ID: ${proposal.evidenceIds.join(', ')}`);
+          addText(item, 'p', '사람 확인이 필요하며 실행되지 않았습니다.');
           proposals.appendChild(item);
         }
         proposalSection.appendChild(proposals);
